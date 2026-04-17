@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CYBER-JOB // DATA HUB</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Noto+Sans+TC:wght@300;400;700&display=swap');
+
+        :root {
+            --bg-color: #050510;
+            --panel-bg: rgba(10, 10, 20, 0.9);
+            --neon-cyan: #00f3ff;
+            --neon-magenta: #ff003c;
+            --neon-yellow: #fcee0a;
+            --text-main: #f5f5f5;
+            --text-dim: #a0a0b0;
+            --grid-color: rgba(0, 243, 255, 0.05);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            background-image: 
+                linear-gradient(var(--grid-color) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+            background-size: 30px 30px;
+            background-position: center;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Scanline effect */
+        body::after {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%);
+            background-size: 100% 4px;
+            z-index: 9999;
+            pointer-events: none;
+        }
+
+        h1, h2, h3, .mono {
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        header {
+            padding: 20px 40px;
+            border-bottom: 2px solid var(--neon-cyan);
+            background: linear-gradient(90deg, var(--bg-color) 0%, rgba(0,243,255,0.1) 100%);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+        }
+
+        header::after {
+            content: "SYS.INITIALIZED";
+            position: absolute;
+            bottom: -20px;
+            right: 40px;
+            color: var(--neon-cyan);
+            font-size: 0.8rem;
+            font-family: 'Share Tech Mono', monospace;
+            background: var(--bg-color);
+            padding: 0 10px;
+        }
+
+        .title {
+            color: var(--neon-cyan);
+            font-size: 2rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px rgba(0, 243, 255, 0.5);
+            position: relative;
+        }
+
+        .title::before {
+            content: attr(data-text);
+            position: absolute;
+            left: -2px;
+            text-shadow: 2px 0 var(--neon-magenta);
+            top: 0;
+            color: var(--neon-cyan);
+            background: var(--bg-color);
+            overflow: hidden;
+            clip: rect(0, 900px, 0, 0);
+            animation: noise-anim 2s infinite linear alternate-reverse;
+        }
+
+        @keyframes noise-anim {
+            0% { clip: rect(10px, 9999px, 86px, 0); }
+            5% { clip: rect(21px, 9999px, 12px, 0); }
+            10% { clip: rect(89px, 9999px, 78px, 0); }
+            15% { clip: rect(4px, 9999px, 34px, 0); }
+            20% { clip: rect(76px, 9999px, 5px, 0); }
+            25% { clip: rect(45px, 9999px, 90px, 0); }
+            30% { clip: rect(32px, 9999px, 44px, 0); }
+            35% { clip: rect(98px, 9999px, 11px, 0); }
+            40% { clip: rect(2px, 9999px, 67px, 0); }
+            45% { clip: rect(56px, 9999px, 88px, 0); }
+            50% { clip: rect(34px, 9999px, 23px, 0); }
+            55% { clip: rect(78px, 9999px, 9px, 0); }
+            60% { clip: rect(12px, 9999px, 55px, 0); }
+            65% { clip: rect(88px, 9999px, 33px, 0); }
+            70% { clip: rect(45px, 9999px, 77px, 0); }
+            75% { clip: rect(23px, 9999px, 99px, 0); }
+            80% { clip: rect(67px, 9999px, 11px, 0); }
+            85% { clip: rect(9px, 9999px, 88px, 0); }
+            90% { clip: rect(44px, 9999px, 22px, 0); }
+            95% { clip: rect(77px, 9999px, 66px, 0); }
+            100% { clip: rect(11px, 9999px, 44px, 0); }
+        }
+
+        .container {
+            display: flex;
+            flex: 1;
+            padding: 20px;
+            gap: 20px;
+            max-width: 1600px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .sidebar {
+            width: 300px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--text-dim);
+            padding: 20px;
+            position: relative;
+            clip-path: polygon(0 0, calc(100% - 15px) 0, 100% 15px, 100% 100%, 15px 100%, 0 calc(100% - 15px));
+        }
+
+        .panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 20px;
+            height: 2px;
+            background: var(--neon-cyan);
+        }
+
+        .panel::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 20px;
+            height: 2px;
+            background: var(--neon-magenta);
+        }
+
+        .panel-title {
+            color: var(--neon-cyan);
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+            border-bottom: 1px dashed var(--text-dim);
+            padding-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .stat-box {
+            background: rgba(0, 243, 255, 0.05);
+            border: 1px solid rgba(0, 243, 255, 0.2);
+            padding: 10px;
+            text-align: center;
+        }
+
+        .stat-value {
+            color: var(--neon-cyan);
+            font-size: 1.5rem;
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+        }
+
+        .stat-box.highlight {
+            border-color: var(--neon-yellow);
+        }
+        .stat-box.highlight .stat-value {
+            color: var(--neon-yellow);
+            text-shadow: 0 0 5px rgba(252, 238, 10, 0.5);
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: var(--neon-cyan);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.9rem;
+        }
+
+        input, select {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--text-dim);
+            color: var(--text-main);
+            padding: 8px 10px;
+            font-family: 'Noto Sans TC', sans-serif;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        input:focus, select:focus {
+            border-color: var(--neon-cyan);
+            box-shadow: 0 0 8px rgba(0, 243, 255, 0.3);
+        }
+
+        .btn {
+            background: transparent;
+            color: var(--neon-cyan);
+            border: 1px solid var(--neon-cyan);
+            padding: 8px 15px;
+            font-family: 'Share Tech Mono', monospace;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+            width: 100%;
+            display: block;
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        .btn:hover {
+            background: var(--neon-cyan);
+            color: var(--bg-color);
+            box-shadow: 0 0 10px var(--neon-cyan);
+        }
+
+        .btn.primary {
+            border-color: var(--neon-yellow);
+            color: var(--neon-yellow);
+        }
+        
+        .btn.primary:hover {
+            background: var(--neon-yellow);
+            color: var(--bg-color);
+            box-shadow: 0 0 10px var(--neon-yellow);
+        }
+
+        /* Job Cards */
+        .job-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow-y: auto;
+            max-height: calc(100vh - 120px);
+            padding-right: 10px;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-color);
+            border-left: 1px solid var(--text-dim);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--neon-cyan);
+        }
+
+        .job-card {
+            background: var(--panel-bg);
+            border: 1px solid #444;
+            border-left: 4px solid var(--neon-cyan);
+            padding: 18px;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 15px;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .job-card:hover {
+            border-color: var(--neon-cyan);
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.1);
+            transform: translateX(5px);
+        }
+
+        .job-card.new {
+            border-left-color: var(--neon-yellow);
+        }
+        
+        .job-card.new::before {
+            content: 'NEW';
+            position: absolute;
+            top: 5px;
+            right: -20px;
+            background: var(--neon-yellow);
+            color: #000;
+            font-size: 0.7rem;
+            padding: 2px 20px;
+            transform: rotate(45deg);
+            font-weight: bold;
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        .job-title {
+            font-size: 1.3rem;
+            color: #ffffff;
+            margin-bottom: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: color 0.2s;
+            letter-spacing: 0.5px;
+        }
+
+        .job-title:hover {
+            color: var(--neon-cyan);
+        }
+
+        .job-company {
+            color: var(--text-dim);
+            font-size: 1rem;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .job-company span {
+            color: var(--neon-magenta);
+        }
+
+        .job-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .tag {
+            background: rgba(0, 243, 255, 0.15);
+            border: 1px solid rgba(0, 243, 255, 0.4);
+            color: #ffffff;
+            padding: 4px 10px;
+            font-size: 0.9rem;
+            border-radius: 2px;
+        }
+
+        .job-meta {
+            font-size: 0.95rem;
+            color: var(--text-dim);
+            display: flex;
+            gap: 15px;
+        }
+
+        .job-salary {
+            color: var(--neon-yellow);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 1.1rem;
+            text-align: right;
+        }
+
+        .job-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .btn-small {
+            padding: 5px 10px;
+            font-size: 0.8rem;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal {
+            background: var(--bg-color);
+            border: 2px solid var(--neon-cyan);
+            width: 90%;
+            max-width: 800px;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            clip-path: polygon(0 0, calc(100% - 30px) 0, 100% 30px, 100% 100%, 30px 100%, 0 calc(100% - 30px));
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.2);
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--neon-cyan);
+            background: rgba(0, 243, 255, 0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--neon-magenta);
+            font-size: 1.5rem;
+            cursor: pointer;
+            font-family: 'Share Tech Mono', monospace;
+            transition: text-shadow 0.2s;
+        }
+
+        .modal-close:hover {
+            text-shadow: 0 0 10px var(--neon-magenta);
+        }
+
+        .modal-body {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .detail-section {
+            margin-bottom: 20px;
+        }
+
+        .detail-section h3 {
+            color: var(--neon-cyan);
+            border-bottom: 1px solid var(--text-dim);
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+        }
+
+        .detail-content {
+            white-space: pre-wrap;
+            color: #ccc;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        .history-item {
+            border-left: 2px solid var(--neon-magenta);
+            padding-left: 15px;
+            margin-bottom: 15px;
+            position: relative;
+        }
+
+        .history-item::before {
+            content: '';
+            position: absolute;
+            left: -6px;
+            top: 0;
+            width: 10px;
+            height: 10px;
+            background: var(--neon-magenta);
+            border-radius: 50%;
+        }
+
+        .history-date {
+            color: var(--neon-yellow);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
+
+        .loading {
+            text-align: center;
+            color: var(--neon-cyan);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 1.5rem;
+            padding: 50px;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.5; }
+            50% { opacity: 1; text-shadow: 0 0 10px var(--neon-cyan); }
+            100% { opacity: 0.5; }
+        }
+
+        .glitch-text {
+            position: relative;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="title" data-text="DATA HUB // JOBS">DATA HUB // JOBS</div>
+    <div class="mono" style="color: var(--neon-yellow);" id="sys-time">SYS.TIME: 00:00:00</div>
+</header>
+
+<div class="container">
+    <aside class="sidebar">
+        <div class="panel">
+            <div class="panel-title">SYSTEM STATUS</div>
+            <div class="stat-grid">
+                <div class="stat-box highlight">
+                    <div class="stat-value" id="stat-total">0</div>
+                    <div class="stat-label">Active Records</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="stat-new">0</div>
+                    <div class="stat-label">New Today</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="stat-inactive">0</div>
+                    <div class="stat-label">Archived</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="stat-salary">0</div>
+                    <div class="stat-label">Salary Known</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-title">FILTER MATRIX</div>
+            <div class="control-group">
+                <label>SEARCH QUERY</label>
+                <input type="text" id="filter-search" placeholder="Enter keywords...">
+            </div>
+            <div class="control-group">
+                <label>JOB ROLE</label>
+                <select id="filter-keyword">
+                    <option value="">ALL ROLES</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>LOCATION</label>
+                <input type="text" id="filter-area" placeholder="e.g. 台北市">
+            </div>
+            <div class="control-group">
+                <label>MIN SALARY</label>
+                <input type="number" id="filter-salary" placeholder="40000">
+            </div>
+            <div class="control-group">
+                <label>SORT BY</label>
+                <select id="filter-sort">
+                    <option value="last_updated_at">LATEST UPDATE</option>
+                    <option value="first_seen_at">NEWEST FIRST</option>
+                    <option value="salary_min">SALARY (DESC)</option>
+                </select>
+            </div>
+            <button class="btn primary" onclick="loadJobs()">EXECUTE QUERY</button>
+            <button class="btn" onclick="resetFilters()">RESET</button>
+        </div>
+        
+        <div class="panel" id="keyword-stats">
+            <div class="panel-title">ROLE DISTRIBUTION</div>
+            <!-- Populated via JS -->
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <div class="panel" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 20px;">
+            <div class="mono" style="color: var(--neon-cyan);">RESULTS: <span id="result-count">0</span></div>
+        </div>
+        
+        <div class="job-list" id="job-list">
+            <div class="loading">FETCHING DATA...</div>
+        </div>
+    </main>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="job-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <div>
+                <h2 class="title" style="font-size: 1.5rem; text-shadow: none;" id="modal-title">JOB TITLE</h2>
+                <div class="mono" style="color: var(--neon-yellow); margin-top: 5px;" id="modal-company">COMPANY</div>
+            </div>
+            <button class="modal-close" onclick="closeModal()">[X]</button>
+        </div>
+        <div class="modal-body">
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px;">
+                <div>
+                    <div class="detail-section">
+                        <h3>REQUIREMENTS</h3>
+                        <div class="detail-content">
+                            <div><strong style="color: var(--text-dim);">EXP:</strong> <span id="modal-exp"></span></div>
+                            <div><strong style="color: var(--text-dim);">EDU:</strong> <span id="modal-edu"></span></div>
+                            <div style="margin-top: 10px;" id="modal-skills"></div>
+                        </div>
+                    </div>
+                    <div class="detail-section">
+                        <h3>DESCRIPTION</h3>
+                        <div class="detail-content" id="modal-desc"></div>
+                    </div>
+                    <div class="detail-section">
+                        <h3>WELFARE</h3>
+                        <div class="detail-content" id="modal-welfare"></div>
+                    </div>
+                </div>
+                <div>
+                    <div class="panel" style="margin-bottom: 20px;">
+                        <div class="mono" style="color: var(--neon-cyan); margin-bottom: 5px;">COMPENSATION</div>
+                        <div class="stat-value" style="font-size: 1.2rem;" id="modal-salary"></div>
+                        <div class="mono" style="color: var(--text-dim); margin-top: 10px; font-size: 0.8rem;" id="modal-area"></div>
+                    </div>
+                    
+                    <a href="#" id="modal-link" target="_blank" class="btn primary" style="text-decoration: none; margin-bottom: 20px;">EXTERNAL LINK // 104</a>
+                    
+                    <div class="detail-section">
+                        <h3>UPDATE HISTORY</h3>
+                        <div id="modal-history"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Update system time
+    setInterval(() => {
+        const now = new Date();
+        document.getElementById('sys-time').innerText = `SYS.TIME: ${now.toLocaleTimeString('en-US', {hour12: false})}`;
+    }, 1000);
+
+    // Initial load
+    document.addEventListener('DOMContentLoaded', () => {
+        loadStats();
+        loadKeywordDropdown();
+        loadJobs();
+    });
+
+    async function loadStats() {
+        try {
+            const res = await fetch('/api/stats');
+            const data = await res.json();
+            
+            document.getElementById('stat-total').innerText = data.total;
+            document.getElementById('stat-new').innerText = data.new_today;
+            document.getElementById('stat-inactive').innerText = data.inactive;
+            document.getElementById('stat-salary').innerText = data.salary_known;
+
+            const kwStats = document.getElementById('keyword-stats');
+            let kwHtml = '<div class="panel-title">ROLE DISTRIBUTION</div>';
+            data.keywords.forEach(k => {
+                kwHtml += `
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.9rem;">
+                        <span style="color: var(--text-main);">${k.keyword}</span>
+                        <span class="mono" style="color: var(--neon-cyan);">${k.cnt}</span>
+                    </div>
+                `;
+            });
+            kwStats.innerHTML = kwHtml;
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    async function loadKeywordDropdown() {
+        try {
+            const res = await fetch('/api/keywords');
+            const kws = await res.json();
+            const select = document.getElementById('filter-keyword');
+            kws.forEach(k => {
+                const opt = document.createElement('option');
+                opt.value = k;
+                opt.innerText = k;
+                select.appendChild(opt);
+            });
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    function resetFilters() {
+        document.getElementById('filter-search').value = '';
+        document.getElementById('filter-keyword').value = '';
+        document.getElementById('filter-area').value = '';
+        document.getElementById('filter-salary').value = '';
+        document.getElementById('filter-sort').value = 'last_updated_at';
+        loadJobs();
+    }
+
+    async function loadJobs() {
+        const list = document.getElementById('job-list');
+        list.innerHTML = '<div class="loading">FETCHING DATA...</div>';
+
+        const params = new URLSearchParams();
+        const search = document.getElementById('filter-search').value;
+        const kw = document.getElementById('filter-keyword').value;
+        const area = document.getElementById('filter-area').value;
+        const salary = document.getElementById('filter-salary').value;
+        const sort = document.getElementById('filter-sort').value;
+
+        if (search) params.append('search', search);
+        if (kw) params.append('keyword', kw);
+        if (area) params.append('area', area);
+        if (salary) params.append('salary_min', salary);
+        if (sort) params.append('sort', sort);
+
+        try {
+            const res = await fetch(`/api/jobs?${params.toString()}`);
+            const jobs = await res.json();
+            
+            document.getElementById('result-count').innerText = jobs.length;
+            
+            if (jobs.length === 0) {
+                list.innerHTML = '<div class="mono" style="text-align: center; padding: 40px; color: var(--text-dim);">NO RECORDS FOUND</div>';
+                return;
+            }
+
+            let html = '';
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            jobs.forEach(j => {
+                const isNew = j.first_seen_at.startsWith(todayStr);
+                const tagHtml = j.skills_list.slice(0, 5).map(s => `<span class="tag">${s}</span>`).join('');
+                const dateStr = new Date(j.last_updated_at).toLocaleDateString('zh-TW');
+
+                html += `
+                    <div class="job-card ${isNew ? 'new' : ''}">
+                        <div>
+                            <div class="job-title" onclick="openJob('${j.job_id}')">${j.title}</div>
+                            <div class="job-company">
+                                <span>[${j.keyword}]</span> ${j.company_name}
+                            </div>
+                            <div class="job-tags">${tagHtml}</div>
+                            <div class="job-meta">
+                                <div><span style="color: var(--text-dim);">LOC:</span> ${j.area}</div>
+                                <div><span style="color: var(--text-dim);">UPDATED:</span> ${dateStr}</div>
+                            </div>
+                        </div>
+                        <div class="job-actions">
+                            <div class="job-salary">${j.salary_desc || 'NEGOTIABLE'}</div>
+                            <button class="btn btn-small" onclick="openJob('${j.job_id}')">DETAILS</button>
+                        </div>
+                    </div>
+                `;
+            });
+            list.innerHTML = html;
+
+        } catch (e) {
+            console.error(e);
+            list.innerHTML = '<div class="mono" style="text-align: center; color: var(--neon-magenta);">ERROR FETCHING DATA</div>';
+        }
+    }
+
+    async function openJob(id) {
+        try {
+            const res = await fetch(`/api/job/${id}`);
+            const data = await res.json();
+            const j = data.job;
+            const h = data.history;
+
+            document.getElementById('modal-title').innerText = j.title;
+            document.getElementById('modal-company').innerText = j.company_name;
+            document.getElementById('modal-exp').innerText = j.experience || 'N/A';
+            document.getElementById('modal-edu').innerText = j.education || 'N/A';
+            
+            const skillsHtml = j.skills_list.map(s => `<span class="tag" style="margin-bottom: 5px; display: inline-block;">${s}</span>`).join(' ');
+            document.getElementById('modal-skills').innerHTML = skillsHtml || '<span style="color: var(--text-dim);">NO SPECIFIC SKILLS LISTED</span>';
+            
+            document.getElementById('modal-desc').innerText = j.description || 'NO DESCRIPTION';
+            document.getElementById('modal-welfare').innerText = j.welfare || 'NO WELFARE DATA';
+            document.getElementById('modal-salary').innerText = j.salary_desc || 'NEGOTIABLE';
+            document.getElementById('modal-area').innerText = j.area || '';
+            document.getElementById('modal-link').href = j.job_url;
+
+            let historyHtml = '';
+            if (h && h.length > 0) {
+                h.forEach(item => {
+                    const d = new Date(item.snapshot_at).toLocaleString('zh-TW');
+                    const reason = item.change_reason === 'new' ? 'INITIAL ENTRY' : 'DATA UPDATED';
+                    historyHtml += `
+                        <div class="history-item">
+                            <div class="history-date">${d} - <span style="color: var(--text-main); font-size: 0.8rem;">${reason}</span></div>
+                            <div style="color: var(--text-dim); font-size: 0.85rem;">Salary: ${item.salary_desc || 'N/A'}</div>
+                        </div>
+                    `;
+                });
+            } else {
+                historyHtml = '<div style="color: var(--text-dim); font-size: 0.9rem;">NO HISTORY AVAILABLE</div>';
+            }
+            document.getElementById('modal-history').innerHTML = historyHtml;
+
+            document.getElementById('job-modal').style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        } catch (e) {
+            console.error(e);
+            alert("Error loading job details.");
+        }
+    }
+
+    function closeModal() {
+        document.getElementById('job-modal').style.display = 'none';
+        document.body.style.overflow = 'auto';
+    }
+
+    // Close modal on outside click
+    document.getElementById('job-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'job-modal') {
+            closeModal();
+        }
+    });
+</script>
+</body>
+</html>

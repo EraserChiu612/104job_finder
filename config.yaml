@@ -1,0 +1,25 @@
+keywords:
+  - "AI應用工程師"
+  - "AI應用規劃師"
+
+areas:
+  - "6001001000"  # 台北市
+  - "6001002000"  # 新北市
+  - "6001005000"  # 桃園市
+
+filters:
+  job_type: 1       # 全職
+  min_salary: 40000 # 月薪最低，0 = 面議也保留
+
+schedule:
+  hour: 9
+  minute: 0
+
+database:
+  path: "data/jobs.db"
+
+request:
+  delay_min: 1.5
+  delay_max: 3.5
+  timeout: 15
+  max_pages: 20   # 每個關鍵字最多幾頁（每頁30筆，20頁=600筆上限）
