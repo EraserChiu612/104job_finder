@@ -140,6 +140,12 @@
             display: flex;
             flex-direction: column;
             gap: 20px;
+            position: sticky;
+            top: 20px;
+            align-self: flex-start;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+            padding-right: 5px; /* 避免捲軸貼齊內容 */
         }
 
         .main-content {
@@ -288,9 +294,6 @@
             display: flex;
             flex-direction: column;
             gap: 15px;
-            overflow-y: auto;
-            max-height: calc(100vh - 120px);
-            padding-right: 10px;
         }
 
         /* Custom Scrollbar */
@@ -671,6 +674,16 @@
         loadStats();
         loadKeywordDropdown();
         loadJobs();
+
+        // 按下 Enter 鍵執行搜尋
+        const inputs = document.querySelectorAll('.control-group input, .control-group select');
+        inputs.forEach(input => {
+            input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    loadJobs();
+                }
+            });
+        });
     });
 
     async function loadStats() {
