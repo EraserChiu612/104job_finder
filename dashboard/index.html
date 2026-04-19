@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CYBER-JOB // DATA HUB</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Noto+Sans+TC:wght@300;400;700&display=swap');
 
@@ -531,15 +532,94 @@
         .glitch-text {
             position: relative;
         }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            color: var(--text-dim);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.95rem;
+            padding: 6px 18px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.2s;
+        }
+        .tab-btn.active {
+            color: var(--neon-yellow);
+            border-bottom-color: var(--neon-yellow);
+            text-shadow: 0 0 8px rgba(252,238,10,0.5);
+        }
+        .tab-btn:hover:not(.active) {
+            color: var(--text-main);
+        }
+
+        .analytics-grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .rank-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.88rem;
+        }
+        .rank-table th {
+            color: var(--neon-cyan);
+            text-align: left;
+            padding: 6px 8px;
+            border-bottom: 1px solid #333;
+            font-family: 'Share Tech Mono', monospace;
+        }
+        .rank-table td {
+            padding: 5px 8px;
+            border-bottom: 1px solid #1a1a2e;
+        }
+        .rank-table .td-right {
+            text-align: right;
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        .other-job-item {
+            border-bottom: 1px solid #1a1a2e;
+            padding: 12px 4px;
+        }
+        .other-job-item:last-child { border-bottom: none; }
+
+        .a-section-header {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.95rem;
+            letter-spacing: 2px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            margin-top: 4px;
+        }
+        .a-section-header::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: linear-gradient(90deg, currentColor 0%, transparent 100%);
+            opacity: 0.4;
+        }
     </style>
 </head>
 <body>
 
 <header>
     <div class="title" data-text="DATA HUB // JOBS">DATA HUB // JOBS</div>
+    <nav style="display:flex; gap:4px; align-self:flex-end; padding-bottom:4px;">
+        <button class="tab-btn active" data-view="jobs" onclick="showView('jobs')">JOB LIST</button>
+        <button class="tab-btn" data-view="analytics" onclick="showView('analytics')">數據分析</button>
+    </nav>
     <div class="mono" style="color: var(--neon-yellow);" id="sys-time">SYS.TIME: 00:00:00</div>
 </header>
 
+<div id="view-jobs">
 <div class="container">
     <aside class="sidebar">
         <div class="panel">
@@ -613,6 +693,95 @@
     </main>
 </div>
 
+</div><!-- /view-jobs -->
+
+<!-- Analytics View -->
+<div id="view-analytics" style="display:none; padding:24px 20px; max-width:1600px; margin:0 auto; width:100%;">
+
+    <!-- Filter bar -->
+    <div class="panel" style="display:flex; gap:15px; align-items:center; margin-bottom:24px; padding:12px 20px;">
+        <span class="mono" style="color:var(--neon-cyan); white-space:nowrap;">▸ ROLE FILTER :</span>
+        <select id="analytics-kw-filter" style="flex:1; max-width:280px;">
+            <option value="">ALL ROLES</option>
+        </select>
+        <button class="btn" style="width:auto; padding:8px 22px; margin-top:0;" onclick="loadAnalytics()">▶ REFRESH</button>
+    </div>
+
+    <!-- KPI Stats Row -->
+    <div id="analytics-kpi" style="display:grid; grid-template-columns: repeat(5, 1fr); gap:12px; margin-bottom:28px;"></div>
+
+    <!-- Skills Section -->
+    <div class="a-section-header" style="color:var(--neon-cyan);">// SKILLS &amp; TOOLS ANALYSIS</div>
+    <div class="analytics-grid-2" style="margin-bottom:28px;">
+        <div class="panel">
+            <div class="panel-title">技能分佈 <span id="skills-subtitle" class="mono" style="color:var(--text-dim);font-size:0.8rem;"></span></div>
+            <div style="position:relative; height:320px;"><canvas id="skills-pie-chart"></canvas></div>
+        </div>
+        <div class="panel">
+            <div class="panel-title">技能排名 Top 15</div>
+            <div style="position:relative; height:320px;"><canvas id="skills-bar-chart"></canvas></div>
+        </div>
+    </div>
+
+    <!-- Market Distribution Section -->
+    <div class="a-section-header" style="color:var(--neon-yellow);">// MARKET DISTRIBUTION</div>
+    <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; gap:20px; margin-bottom:28px;">
+        <div class="panel">
+            <div class="panel-title">地區分佈 Top 10</div>
+            <div style="position:relative; height:280px;"><canvas id="area-bar-chart"></canvas></div>
+        </div>
+        <div class="panel">
+            <div class="panel-title">經驗要求分佈</div>
+            <div style="position:relative; height:280px;"><canvas id="exp-pie-chart"></canvas></div>
+        </div>
+        <div class="panel">
+            <div class="panel-title">學歷要求分佈</div>
+            <div style="position:relative; height:280px;"><canvas id="edu-pie-chart"></canvas></div>
+        </div>
+    </div>
+
+    <!-- Salary + Skills Table -->
+    <div class="analytics-grid-2" style="margin-bottom:28px;">
+        <div class="panel">
+            <div class="panel-title">薪資區間分佈</div>
+            <div style="position:relative; height:220px;"><canvas id="salary-bar-chart"></canvas></div>
+        </div>
+        <div class="panel">
+            <div class="panel-title">完整技能列表 <span id="skills-total-count" class="mono" style="color:var(--text-dim);font-size:0.8rem;"></span></div>
+            <div id="skills-table" style="max-height:220px; overflow-y:auto;"></div>
+        </div>
+    </div>
+
+    <!-- Other Conditions Section -->
+    <div class="a-section-header" style="color:var(--neon-magenta);">// OTHER CONDITIONS ANALYSIS</div>
+    <div class="analytics-grid-2" style="margin-bottom:20px;">
+        <div class="panel">
+            <div class="panel-title">關鍵字分佈 <span id="other-subtitle" class="mono" style="color:var(--text-dim);font-size:0.8rem;"></span></div>
+            <div style="position:relative; height:300px;"><canvas id="other-pie-chart"></canvas></div>
+        </div>
+        <div class="panel">
+            <div class="panel-title">關鍵字排名 Top 15</div>
+            <div style="position:relative; height:300px;"><canvas id="other-bar-chart"></canvas></div>
+        </div>
+    </div>
+
+    <!-- Tag cloud -->
+    <div class="panel" style="margin-bottom:20px;">
+        <div class="panel-title">關鍵字標籤雲</div>
+        <div id="other-tag-cloud" style="padding:8px; line-height:2.6; min-height:80px;"></div>
+    </div>
+
+    <!-- Full list (collapsible) -->
+    <div class="panel">
+        <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
+            <span>其他條件 — 原文列表 <span id="other-jobs-count" class="mono" style="color:var(--text-dim);font-size:0.85rem;"></span></span>
+            <button onclick="toggleOtherList()" class="btn" style="width:auto;padding:3px 14px;margin:0;font-size:0.8rem;" id="other-list-toggle">▼ 展開</button>
+        </div>
+        <div id="other-jobs-list" style="display:none; max-height:520px; overflow-y:auto; padding-top:8px;"></div>
+    </div>
+
+</div>
+
 <!-- Modal -->
 <div class="modal-overlay" id="job-modal">
     <div class="modal">
@@ -629,9 +798,11 @@
                     <div class="detail-section">
                         <h3>REQUIREMENTS</h3>
                         <div class="detail-content">
-                            <div><strong style="color: var(--text-dim);">EXP:</strong> <span id="modal-exp"></span></div>
-                            <div><strong style="color: var(--text-dim);">EDU:</strong> <span id="modal-edu"></span></div>
-                            <div style="margin-top: 10px;" id="modal-skills"></div>
+                            <div><strong style="color: var(--text-dim);">工作性質:</strong> <span id="modal-jobtype"></span></div>
+                            <div><strong style="color: var(--text-dim);">工作年資:</strong> <span id="modal-exp"></span></div>
+                            <div><strong style="color: var(--text-dim);">學歷要求:</strong> <span id="modal-edu"></span></div>
+                            <div style="margin-top: 8px;" id="modal-skills"></div>
+                            <div style="margin-top: 8px;" id="modal-other"></div>
                         </div>
                     </div>
                     <div class="detail-section">
@@ -663,7 +834,272 @@
 </div>
 
 <script>
-    // Update system time
+    // ── Cyberpunk chart color palette ──
+    const CHART_COLORS = [
+        '#00f3ff','#fcee0a','#ff003c','#00ff7f','#ff6b35',
+        '#bf5fff','#00ccff','#ff66b2','#39ff14','#ff9900','#66ccff'
+    ];
+
+    // ── Tab switching ──
+    function showView(view) {
+        document.getElementById('view-jobs').style.display      = view === 'jobs'      ? '' : 'none';
+        document.getElementById('view-analytics').style.display = view === 'analytics' ? '' : 'none';
+        document.querySelectorAll('.tab-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.view === view);
+        });
+        if (view === 'analytics') loadAnalytics();
+    }
+
+    // ── Chart instances ──
+    let skillsChart = null, skillsBarChart = null;
+    let otherChart = null, otherBarChart = null;
+    let areaBarChart = null, expChart = null, eduChart = null, salaryChart = null;
+
+    // ── Load all analytics data ──
+    async function loadAnalytics() {
+        const kw = document.getElementById('analytics-kw-filter').value;
+        const qs = kw ? '?keyword=' + encodeURIComponent(kw) : '';
+        try {
+            const [sRes, oRes, dRes, stRes] = await Promise.all([
+                fetch('/api/analytics/skills' + qs),
+                fetch('/api/analytics/other' + qs),
+                fetch('/api/analytics/distribution' + qs),
+                fetch('/api/stats'),
+            ]);
+            const skillsData = await sRes.json();
+            const otherData  = await oRes.json();
+            const distData   = await dRes.json();
+            const statsData  = await stRes.json();
+
+            renderKPI(statsData, skillsData, distData);
+            renderSkillsSection(skillsData);
+            renderDistSection(distData);
+            renderOtherSection(otherData);
+            renderOtherJobsList(otherData.jobs);
+        } catch(e) {
+            console.error('Analytics error:', e);
+        }
+    }
+
+    function renderKPI(stats, skillsData, distData) {
+        const topSkill = skillsData.length > 0 ? skillsData[0].name : 'N/A';
+        const salPct   = stats.total > 0 ? Math.round(stats.salary_known / stats.total * 100) : 0;
+        const avgK     = distData.avg_salary > 0 ? (distData.avg_salary / 1000).toFixed(0) + 'K' : 'N/A';
+        const kpis = [
+            { label: 'ACTIVE JOBS',   value: stats.total,       color: 'var(--neon-cyan)'   },
+            { label: 'UNIQUE SKILLS', value: skillsData.length, color: 'var(--neon-yellow)' },
+            { label: 'SALARY KNOWN',  value: salPct + '%',      color: '#00ff7f'            },
+            { label: 'AVG SALARY',    value: avgK,              color: '#ff6b35'            },
+            { label: 'TOP SKILL',     value: topSkill,          color: 'var(--neon-magenta)', small: true },
+        ];
+        document.getElementById('analytics-kpi').innerHTML = kpis.map(k => `
+            <div class="panel" style="text-align:center; padding:16px 10px;">
+                <div class="mono" style="color:${k.color}; font-size:${k.small?'1rem':'1.6rem'}; font-weight:bold; word-break:break-all;">${k.value}</div>
+                <div class="stat-label" style="margin-top:6px; font-size:0.72rem;">${k.label}</div>
+            </div>
+        `).join('');
+    }
+
+    function renderSkillsSection(data) {
+        const top10 = data.slice(0, 10);
+        const rest  = data.slice(10).reduce((s,d) => s + d.count, 0);
+        const pieLbls = top10.map(d => d.name);
+        const pieCnts = top10.map(d => d.count);
+        if (rest > 0) { pieLbls.push('其他'); pieCnts.push(rest); }
+        document.getElementById('skills-subtitle').innerText = `(共 ${data.length} 種)`;
+        document.getElementById('skills-total-count').innerText =
+            `(${data.length} 種 / 合計 ${data.reduce((s,d)=>s+d.count,0)} 次)`;
+        skillsChart    = buildDoughnutChart('skills-pie-chart', pieLbls, pieCnts, skillsChart, '次數');
+        const top15    = data.slice(0, 15);
+        skillsBarChart = buildHBarChart('skills-bar-chart', top15.map(d=>d.name), top15.map(d=>d.count), skillsBarChart);
+        renderRankTable('skills-table', data);
+    }
+
+    function renderDistSection(dist) {
+        const areas = dist.area_dist;
+        areaBarChart = buildHBarChart('area-bar-chart', areas.map(a=>a.area), areas.map(a=>a.cnt), areaBarChart);
+        const exps = dist.experience_dist.filter(e => e.experience);
+        expChart = buildDoughnutChart('exp-pie-chart', exps.map(e=>e.experience), exps.map(e=>e.cnt), expChart, '工作');
+        const edus = dist.education_dist.filter(e => e.education);
+        eduChart = buildDoughnutChart('edu-pie-chart', edus.map(e=>e.education), edus.map(e=>e.cnt), eduChart, '學歷');
+        const sal = dist.salary_dist;
+        const salColors = ['#555','#fcee0a','#ff6b35','#00ff7f','#00f3ff','#bf5fff'];
+        salaryChart = buildBarChart('salary-bar-chart', sal.map(s=>s.range), sal.map(s=>s.count), salColors, salaryChart);
+    }
+
+    function renderOtherSection(data) {
+        const keywords = data.keywords;
+        document.getElementById('other-subtitle').innerText = `(共 ${keywords.length} 種)`;
+        const top10 = keywords.slice(0, 10);
+        const rest  = keywords.slice(10).reduce((s,d) => s + d.count, 0);
+        const pieLbls = top10.map(d => d.name);
+        const pieCnts = top10.map(d => d.count);
+        if (rest > 0) { pieLbls.push('其他'); pieCnts.push(rest); }
+        otherChart    = buildDoughnutChart('other-pie-chart', pieLbls, pieCnts, otherChart, '次數');
+        const top15   = keywords.slice(0, 15);
+        otherBarChart = buildHBarChart('other-bar-chart', top15.map(d=>d.name), top15.map(d=>d.count), otherBarChart);
+        renderTagCloud(keywords);
+    }
+
+    // ── Doughnut chart with center text ──
+    function buildDoughnutChart(canvasId, labels, counts, oldChart, centerLabel) {
+        if (oldChart) oldChart.destroy();
+        const ctx   = document.getElementById(canvasId).getContext('2d');
+        const total = counts.reduce((a,b) => a+b, 0);
+        const centerPlugin = {
+            id: 'center_' + canvasId,
+            afterDraw(chart) {
+                const { ctx: c, chartArea: { width, height, left, top } } = chart;
+                const cx = left + width / 2, cy = top + height / 2;
+                c.save();
+                c.textAlign = 'center'; c.textBaseline = 'middle';
+                c.fillStyle = '#00f3ff';
+                c.font = 'bold 18px "Share Tech Mono"';
+                c.fillText(total, cx, cy - 9);
+                c.fillStyle = '#a0a0b0';
+                c.font = '10px "Noto Sans TC"';
+                c.fillText(centerLabel || 'total', cx, cy + 11);
+                c.restore();
+            }
+        };
+        return new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels,
+                datasets: [{ data: counts, backgroundColor: CHART_COLORS.slice(0, labels.length), borderColor: '#050510', borderWidth: 2 }]
+            },
+            plugins: [centerPlugin],
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '58%',
+                plugins: {
+                    legend: { position: 'right', labels: { color: '#f5f5f5', font: { size: 10 }, boxWidth: 12, padding: 6 } },
+                    tooltip: { callbacks: { label(ctx) {
+                        const t = ctx.dataset.data.reduce((a,b)=>a+b,0);
+                        return ` ${ctx.label}: ${ctx.raw} (${(ctx.raw/t*100).toFixed(1)}%)`;
+                    }}}
+                }
+            }
+        });
+    }
+
+    // ── Horizontal bar chart ──
+    function buildHBarChart(canvasId, labels, counts, oldChart) {
+        if (oldChart) oldChart.destroy();
+        const ctx    = document.getElementById(canvasId).getContext('2d');
+        const colors = CHART_COLORS.slice(0, labels.length);
+        return new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [{ data: counts, backgroundColor: colors.map(c=>c+'99'), borderColor: colors, borderWidth: 1, borderRadius: 2 }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { ticks: { color: '#a0a0b0', font:{size:10} }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#333' } },
+                    y: { ticks: { color: '#e0e0e0', font:{size:10} }, grid: { display: false }, border: { color: '#333' } }
+                }
+            }
+        });
+    }
+
+    // ── Vertical bar chart ──
+    function buildBarChart(canvasId, labels, counts, colors, oldChart) {
+        if (oldChart) oldChart.destroy();
+        const ctx     = document.getElementById(canvasId).getContext('2d');
+        const palette = (colors || CHART_COLORS).slice(0, labels.length);
+        return new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [{ data: counts, backgroundColor: palette.map(c=>c+'99'), borderColor: palette, borderWidth: 1, borderRadius: 3 }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { ticks: { color: '#e0e0e0', font:{size:11} }, grid: { display: false } },
+                    y: { ticks: { color: '#a0a0b0', font:{size:10} }, grid: { color: 'rgba(255,255,255,0.04)' } }
+                }
+            }
+        });
+    }
+
+    // ── Ranking table with inline progress bars ──
+    function renderRankTable(elId, data) {
+        const el = document.getElementById(elId);
+        if (!data.length) { el.innerHTML = '<div style="color:var(--text-dim);padding:20px;">無資料</div>'; return; }
+        const maxCount = data[0].count;
+        const total    = data.reduce((s,d) => s + d.count, 0);
+        let html = `<table class="rank-table"><thead><tr>
+            <th style="width:26px">#</th><th>名稱</th><th></th>
+            <th class="td-right" style="width:46px">次數</th>
+            <th class="td-right" style="width:46px">佔比</th>
+        </tr></thead><tbody>`;
+        data.forEach((d, i) => {
+            const color = CHART_COLORS[i % CHART_COLORS.length];
+            const pct   = (d.count / total * 100).toFixed(1);
+            const barW  = (d.count / maxCount * 100).toFixed(0);
+            html += `<tr>
+                <td style="color:var(--text-dim);font-size:0.78rem;">${i+1}</td>
+                <td style="color:${color};">${d.name}</td>
+                <td><div style="background:${color}44;width:${barW}%;height:4px;border-radius:2px;min-width:2px;"></div></td>
+                <td class="td-right" style="color:var(--neon-cyan);font-size:0.82rem;">${d.count}</td>
+                <td class="td-right" style="color:var(--text-dim);font-size:0.78rem;">${pct}%</td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        el.innerHTML = html;
+    }
+
+    // ── Tag cloud ──
+    function renderTagCloud(keywords) {
+        const el = document.getElementById('other-tag-cloud');
+        if (!keywords.length) { el.innerHTML = '<div style="color:var(--text-dim)">無資料</div>'; return; }
+        const maxCount = keywords[0].count;
+        el.innerHTML = keywords.map((k, i) => {
+            const size  = (0.78 + (k.count / maxCount) * 0.9).toFixed(2);
+            const color = CHART_COLORS[i % CHART_COLORS.length];
+            return `<span style="display:inline-block;margin:3px 5px;font-size:${size}rem;color:${color};cursor:default;padding:2px 8px;border:1px solid ${color}55;border-radius:2px;transition:all 0.2s"
+                onmouseover="this.style.background='${color}22';this.style.textShadow='0 0 8px ${color}'"
+                onmouseout="this.style.background='';this.style.textShadow=''"
+                title="${k.name}: ${k.count} 次">${k.name} <span style="font-size:0.7em;opacity:0.55">${k.count}</span></span>`;
+        }).join('');
+    }
+
+    // ── Toggle other list ──
+    function toggleOtherList() {
+        const el   = document.getElementById('other-jobs-list');
+        const btn  = document.getElementById('other-list-toggle');
+        const show = el.style.display === 'none';
+        el.style.display = show ? 'block' : 'none';
+        btn.textContent  = show ? '▲ 收合' : '▼ 展開';
+    }
+
+    // ── Other conditions full list ──
+    function renderOtherJobsList(jobs) {
+        document.getElementById('other-jobs-count').innerText = `(${jobs.length} 筆有填寫)`;
+        const el = document.getElementById('other-jobs-list');
+        if (!jobs.length) { el.innerHTML = '<div style="color:var(--text-dim);padding:20px;">無資料</div>'; return; }
+        el.innerHTML = jobs.map(j => {
+            const lines = (j.other || '').split('\n')
+                .map(l => l.trim()).filter(l => l)
+                .map(l => `<div style="margin:2px 0;">• ${l}</div>`).join('');
+            return `<div class="other-job-item">
+                <div style="font-weight:bold;color:#fff;margin-bottom:3px;">${j.title}</div>
+                <div style="color:var(--neon-magenta);font-size:0.82rem;margin-bottom:6px;">${j.company}</div>
+                <div style="color:var(--text-dim);font-size:0.85rem;line-height:1.7;">${lines}</div>
+            </div>`;
+        }).join('');
+    }
+
+    // ── Update system time ──
     setInterval(() => {
         const now = new Date();
         document.getElementById('sys-time').innerText = `SYS.TIME: ${now.toLocaleTimeString('en-US', {hour12: false})}`;
@@ -716,12 +1152,17 @@
         try {
             const res = await fetch('/api/keywords');
             const kws = await res.json();
-            const select = document.getElementById('filter-keyword');
-            kws.forEach(k => {
-                const opt = document.createElement('option');
-                opt.value = k;
-                opt.innerText = k;
-                select.appendChild(opt);
+            ['filter-keyword', 'analytics-kw-filter'].forEach(id => {
+                const select = document.getElementById(id);
+                if (!select) return;
+                // clear existing options except first
+                while (select.options.length > 1) select.remove(1);
+                kws.forEach(k => {
+                    const opt = document.createElement('option');
+                    opt.value = k;
+                    opt.innerText = k;
+                    select.appendChild(opt);
+                });
             });
         } catch (e) {
             console.error(e);
@@ -783,6 +1224,8 @@
                             <div class="job-tags">${tagHtml}</div>
                             <div class="job-meta">
                                 <div><span style="color: var(--text-dim);">LOC:</span> ${j.area}</div>
+                                <div><span style="color: var(--text-dim);">EXP:</span> ${j.experience || '-'}</div>
+                                <div><span style="color: var(--text-dim);">EDU:</span> ${j.education || '-'}</div>
                                 <div><span style="color: var(--text-dim);">UPDATED:</span> ${dateStr}</div>
                             </div>
                         </div>
@@ -808,13 +1251,23 @@
             const j = data.job;
             const h = data.history;
 
+            const jobTypeMap = {'1': '全職', '2': '兼職', '3': '高階主管', '4': '派遣'};
+
             document.getElementById('modal-title').innerText = j.title;
             document.getElementById('modal-company').innerText = j.company_name;
+            document.getElementById('modal-jobtype').innerText = jobTypeMap[j.job_type] || j.job_type || 'N/A';
             document.getElementById('modal-exp').innerText = j.experience || 'N/A';
             document.getElementById('modal-edu').innerText = j.education || 'N/A';
-            
+
             const skillsHtml = j.skills_list.map(s => `<span class="tag" style="margin-bottom: 5px; display: inline-block;">${s}</span>`).join(' ');
             document.getElementById('modal-skills').innerHTML = skillsHtml || '<span style="color: var(--text-dim);">NO SPECIFIC SKILLS LISTED</span>';
+
+            const otherEl = document.getElementById('modal-other');
+            if (j.other) {
+                otherEl.innerHTML = `<strong style="color: var(--text-dim);">其他條件:</strong><div style="color: #ccc; margin-top: 4px; font-size: 0.9rem;">${j.other}</div>`;
+            } else {
+                otherEl.innerHTML = '';
+            }
             
             document.getElementById('modal-desc').innerText = j.description || 'NO DESCRIPTION';
             document.getElementById('modal-welfare').innerText = j.welfare || 'NO WELFARE DATA';

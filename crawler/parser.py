@@ -111,6 +111,7 @@ def parse_detail(raw: dict) -> dict:
         "education": education,
         "job_type": job_detail.get("jobType", ""),
         "skills": json.dumps(skills, ensure_ascii=False),
+        "other": other or None,
         "description": job_detail.get("jobDescription", ""),
         "welfare": welfare.get("welfare", ""),
         "salary_min": sal_min or None,

@@ -6,7 +6,9 @@ dashboard.py - 本地職缺儀表板 Server
 """
 
 import json
+import re
 import sqlite3
+from collections import Counter
 from pathlib import Path
 
 import yaml
@@ -162,6 +164,162 @@ def api_keywords():
         return jsonify(cfg.get("keywords", []))
     except Exception:
         return jsonify([])
+
+
+# ─────────────────────────────────────────────
+# Analytics Routes
+# ─────────────────────────────────────────────
+
+@app.route("/api/analytics/skills")
+def api_analytics_skills():
+    conn = get_db()
+    kw = request.args.get("keyword", "")
+    sql = "SELECT skills FROM jobs WHERE is_active=1 AND skills IS NOT NULL"
+    params = []
+    if kw:
+        sql += " AND keyword=?"
+        params.append(kw)
+    rows = conn.execute(sql, params).fetchall()
+    conn.close()
+
+    counter = Counter()
+    for row in rows:
+        try:
+            for s in json.loads(row["skills"]):
+                s = s.strip()
+                if s:
+                    counter[s] += 1
+        except Exception:
+            pass
+
+    return jsonify([{"name": k, "count": v} for k, v in counter.most_common(50)])
+
+
+@app.route("/api/analytics/other")
+def api_analytics_other():
+    conn = get_db()
+    kw = request.args.get("keyword", "")
+    sql = "SELECT title, company_name, other FROM jobs WHERE is_active=1 AND other IS NOT NULL AND other != ''"
+    params = []
+    if kw:
+        sql += " AND keyword=?"
+        params.append(kw)
+    rows = conn.execute(sql, params).fetchall()
+    conn.close()
+
+    stop_words = {
+        # 單字語助詞 / 介詞
+        '的', '了', '及', '與', '或', '在', '有', '能', '是', '並', '且', '等',
+        '可', '以', '為', '將', '對', '於', '不', '需', '要', '具', '熟', '年',
+        '之', '其', '此', '由', '至', '從', '使', '但', '若', '即', '則', '才',
+        '亦', '已', '每', '各', '無', '另', '含', '依', '按', '均',
+        # 連接詞 / 副詞
+        '以及', '並且', '而且', '不但', '不僅', '雖然', '然而', '因此', '所以',
+        '因而', '以便', '同時', '此外', '另外', '除此', '否則', '進而', '其次',
+        '再者', '甚至', '例如', '諸如', '等等', '其中', '其他', '如下', '如上',
+        '以下', '上述', '下列', '包含', '包括', '涵蓋',
+        # 職缺常見贅詞
+        '工作', '相關', '優先', '佳', '者', '如', '歡迎', '請', '需要', '具有',
+        '具備', '良好', '以上', '擔任', '負責', '參與', '了解', '熟悉', '使用',
+        '不限', '不拘', '尤佳', '為佳', '加分', '必須', '基本', '有效',
+        '有意者', '有意願', '有興趣', '有相關', '具相關', '優先考慮',
+        '相關經驗', '工作經驗', '以上經驗',
+    }
+
+    keyword_counter = Counter()
+    job_list = []
+
+    for row in rows:
+        text = row["other"] or ""
+        job_list.append({
+            "title": row["title"],
+            "company": row["company_name"],
+            "other": text,
+        })
+        tokens = re.split(r'[、，,\s。！？；：\n\r\t＊*•·\-－]+', text)
+        for token in tokens:
+            token = re.sub(r'^[\d\.\、\s]+', '', token).strip('「」【】()（）[]〔〕《》')
+            if len(token) >= 2 and token not in stop_words and not token.isdigit():
+                keyword_counter[token] += 1
+
+    return jsonify({
+        "keywords": [{"name": k, "count": v} for k, v in keyword_counter.most_common(30)],
+        "jobs": job_list,
+    })
+
+
+@app.route("/api/analytics/distribution")
+def api_analytics_distribution():
+    conn = get_db()
+    kw = request.args.get("keyword", "")
+    base = "WHERE is_active=1"
+    params = []
+    if kw:
+        base += " AND keyword=?"
+        params.append(kw)
+
+    salary_rows = conn.execute(
+        f"SELECT salary_min FROM jobs {base} AND salary_min > 0", params
+    ).fetchall()
+    no_salary = conn.execute(
+        f"SELECT COUNT(*) FROM jobs {base} AND (salary_min = 0 OR salary_min IS NULL)", params
+    ).fetchone()[0]
+
+    buckets = {"<40K": 0, "40-60K": 0, "60-80K": 0, "80-100K": 0, ">100K": 0}
+    total_sal = 0
+    for row in salary_rows:
+        s = row[0]
+        total_sal += s
+        if s < 40000: buckets["<40K"] += 1
+        elif s < 60000: buckets["40-60K"] += 1
+        elif s < 80000: buckets["60-80K"] += 1
+        elif s < 100000: buckets["80-100K"] += 1
+        else: buckets[">100K"] += 1
+
+    avg_salary = int(total_sal / len(salary_rows)) if salary_rows else 0
+
+    exp_rows = conn.execute(
+        f"SELECT experience, COUNT(*) as cnt FROM jobs {base} AND experience IS NOT NULL AND experience != '' GROUP BY experience ORDER BY cnt DESC", params
+    ).fetchall()
+    edu_raw = conn.execute(
+        f"SELECT education, COUNT(*) as cnt FROM jobs {base} AND education IS NOT NULL AND education != '' GROUP BY education ORDER BY cnt DESC", params
+    ).fetchall()
+    # 取最低學歷：依序定義，分割多選值後取最低層級
+    _EDU_ORDER = ['不拘', '高中職', '高中', '專科', '大學', '碩士', '博士']
+    def _min_edu(raw):
+        parts = re.split(r'[、,，]', (raw or '').replace('以上', '').replace('（職）', ''))
+        parts = [p.strip() for p in parts if p.strip()]
+        if not parts:
+            return '不拘'
+        best_idx, best = len(_EDU_ORDER), parts[0]
+        for p in parts:
+            for i, lvl in enumerate(_EDU_ORDER):
+                if lvl in p:
+                    if i < best_idx:
+                        best_idx, best = i, lvl
+                    break
+        return best
+    edu_map = {}
+    for row in edu_raw:
+        label = _min_edu(row['education'])
+        edu_map[label] = edu_map.get(label, 0) + row['cnt']
+    edu_rows = sorted([{'education': k, 'cnt': v} for k, v in edu_map.items()], key=lambda x: -x['cnt'])
+
+    area_rows = conn.execute(
+        f"SELECT area, COUNT(*) as cnt FROM jobs {base} AND area IS NOT NULL AND area != '' GROUP BY area ORDER BY cnt DESC LIMIT 10", params
+    ).fetchall()
+    conn.close()
+
+    salary_dist = [{"range": "面議/未知", "count": no_salary}]
+    salary_dist += [{"range": k, "count": v} for k, v in buckets.items()]
+
+    return jsonify({
+        "salary_dist": salary_dist,
+        "avg_salary": avg_salary,
+        "experience_dist": [dict(r) for r in exp_rows],
+        "education_dist": edu_rows,
+        "area_dist": [dict(r) for r in area_rows],
+    })
 
 
 # ─────────────────────────────────────────────

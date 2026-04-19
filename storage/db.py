@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     experience      TEXT,
     education       TEXT,
     skills          TEXT,       -- JSON array string
+    other           TEXT,
     description     TEXT,
     welfare         TEXT,
     job_url         TEXT,
@@ -47,6 +48,7 @@ CREATE TABLE IF NOT EXISTS job_history (
     experience      TEXT,
     education       TEXT,
     skills          TEXT,
+    other           TEXT,
     description     TEXT,
     welfare         TEXT,
     content_hash    TEXT,
@@ -83,7 +85,16 @@ class JobDB:
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
         self.conn.commit()
+        self._migrate()
         logger.info("DB 已就緒：%s", db_path)
+
+    def _migrate(self):
+        for table in ("jobs", "job_history"):
+            try:
+                self.conn.execute(f"ALTER TABLE {table} ADD COLUMN other TEXT")
+                self.conn.commit()
+            except Exception:
+                pass
 
     # ------------------------------------------------------------------ helpers
     @staticmethod
@@ -95,11 +106,11 @@ class JobDB:
             """
             INSERT INTO job_history
                 (job_id, snapshot_at, title, company_name, salary_desc,
-                 job_type, experience, education, skills,
+                 job_type, experience, education, skills, other,
                  description, welfare, content_hash, change_reason)
             VALUES
                 (:job_id, :snapshot_at, :title, :company_name, :salary_desc,
-                 :job_type, :experience, :education, :skills,
+                 :job_type, :experience, :education, :skills, :other,
                  :description, :welfare, :content_hash, :change_reason)
             """,
             {
@@ -131,13 +142,13 @@ class JobDB:
                 INSERT INTO jobs
                     (job_id, keyword, title, company_name, company_id, area,
                      salary_min, salary_max, salary_desc, job_type,
-                     experience, education, skills, description, welfare,
+                     experience, education, skills, other, description, welfare,
                      job_url, first_seen_at, last_seen_at, last_updated_at,
                      is_active, content_hash)
                 VALUES
                     (:job_id, :keyword, :title, :company_name, :company_id, :area,
                      :salary_min, :salary_max, :salary_desc, :job_type,
-                     :experience, :education, :skills, :description, :welfare,
+                     :experience, :education, :skills, :other, :description, :welfare,
                      :job_url, :now, :now, :now,
                      1, :content_hash)
                 """,
@@ -147,10 +158,10 @@ class JobDB:
             self.conn.commit()
             return "new"
 
-        # 更新 last_seen
+        # 更新 last_seen，同時補上 other（若之前是 NULL）
         self.conn.execute(
-            "UPDATE jobs SET last_seen_at = ?, is_active = 1 WHERE job_id = ?",
-            (now, job_id),
+            "UPDATE jobs SET last_seen_at = ?, is_active = 1, other = COALESCE(other, ?) WHERE job_id = ?",
+            (now, job.get("other"), job_id),
         )
 
         if row["content_hash"] != new_hash:
@@ -167,6 +178,7 @@ class JobDB:
                     experience      = :experience,
                     education       = :education,
                     skills          = :skills,
+                    other           = :other,
                     description     = :description,
                     welfare         = :welfare,
                     last_updated_at = :now,
