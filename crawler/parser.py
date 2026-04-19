@@ -75,19 +75,21 @@ def extract_job_id(link: str) -> str:
 def normalize_salary_to_monthly(sal_value: int, sal_type: int) -> int:
     """
     將各種薪資類型轉換成月薪（新台幣）。
-    s5 類型：1=時薪, 2=日薪, 3=月薪, 4=論件計酬, 6=年薪
+
+    List API s5：  0=月薪(直接值), 1=時薪, 2=日薪, 3=月薪, 4=論件計酬, 6=年薪
+    Detail API salaryType：10=面議, 20=時薪, 30=日薪, 40=論件計酬, 50=月薪, 60=年薪
     """
     if not sal_value or sal_value <= 0:
         return 0
-    if sal_type == 1:  # 時薪 → 月薪 (時薪 × 8 hours × 22 days)
+    if sal_type in (1, 20):    # 時薪 → 月薪
         return int(sal_value * 8 * 22)
-    elif sal_type == 2:  # 日薪 → 月薪 (日薪 × 22 days)
+    elif sal_type in (2, 30):  # 日薪 → 月薪
         return int(sal_value * 22)
-    elif sal_type == 3:  # 月薪
+    elif sal_type in (0, 3, 50):  # 月薪（含 list API s5=0 直接就是月薪值）
         return sal_value
-    elif sal_type == 6:  # 年薪 → 月薪
+    elif sal_type in (6, 60):  # 年薪 → 月薪
         return int(sal_value / 12)
-    else:  # 論件計酬或其他，無法標準化
+    else:  # 10=面議, 40=論件計酬, 其他無法標準化
         return 0
 
 
@@ -191,16 +193,8 @@ def parse_detail(raw: dict) -> dict:
     sal_max_raw = job_detail.get("salaryMax", 0) or 0
 
     # 推測薪資類型（從 salary_desc 或直接欄位）
-    sal_type = job_detail.get("salaryType", 3)  # 預設月薪
-    if sal_type == 0:  # 若欄位為 0，試著從 salary_desc 推測
-        if "時薪" in salary_desc:
-            sal_type = 1
-        elif "日薪" in salary_desc:
-            sal_type = 2
-        elif "年薪" in salary_desc:
-            sal_type = 6
-        else:
-            sal_type = 3  # 預設月薪
+    # detail API: 10=面議, 20=時薪, 30=日薪, 40=論件計酬, 50=月薪, 60=年薪
+    sal_type = job_detail.get("salaryType", 50)  # 預設月薪
 
     # 正規化到月薪
     sal_min = normalize_salary_to_monthly(sal_min_raw, sal_type)
