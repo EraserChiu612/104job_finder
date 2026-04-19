@@ -12,6 +12,25 @@ def extract_job_id(link: str) -> str:
     return link.rstrip("/").split("/")[-1]
 
 
+def normalize_salary_to_monthly(sal_value: int, sal_type: int) -> int:
+    """
+    將各種薪資類型轉換成月薪（新台幣）。
+    s5 類型：1=時薪, 2=日薪, 3=月薪, 4=論件計酬, 6=年薪
+    """
+    if not sal_value or sal_value <= 0:
+        return 0
+    if sal_type == 1:  # 時薪 → 月薪 (時薪 × 8 hours × 22 days)
+        return int(sal_value * 8 * 22)
+    elif sal_type == 2:  # 日薪 → 月薪 (日薪 × 22 days)
+        return int(sal_value * 22)
+    elif sal_type == 3:  # 月薪
+        return sal_value
+    elif sal_type == 6:  # 年薪 → 月薪
+        return int(sal_value / 12)
+    else:  # 論件計酬或其他，無法標準化
+        return 0
+
+
 def parse_salary(text: str) -> tuple:
     """
     解析薪資字串，回傳 (min, max)。
@@ -32,14 +51,20 @@ def parse_list_item(item: dict) -> dict:
     job_id = extract_job_id(job_url)
 
     # 新 API: 薪資為 salaryLow / salaryHigh（整數），無 salaryDesc
-    sal_min = item.get("salaryLow", 0) or 0
-    sal_max = item.get("salaryHigh", 0) or 0
+    sal_min_raw = item.get("salaryLow", 0) or 0
+    sal_max_raw = item.get("salaryHigh", 0) or 0
     # s5: 薪資類型 (1=時薪, 2=日薪, 3=月薪, 4=論件計酬, 6=年薪)
-    sal_type = item.get("s5", 0)
+    sal_type = item.get("s5", 3)  # 預設為月薪
+
+    # 正規化到月薪
+    sal_min = normalize_salary_to_monthly(sal_min_raw, sal_type)
+    sal_max = normalize_salary_to_monthly(sal_max_raw, sal_type)
+
+    # 薪資描述：統一以月薪格式呈現
     if sal_min and sal_max:
-        salary_desc = f"月薪 {sal_min:,}～{sal_max:,} 元" if sal_type == 3 else f"{sal_min:,}～{sal_max:,}"
+        salary_desc = f"月薪 {sal_min:,}～{sal_max:,} 元"
     elif sal_min:
-        salary_desc = f"月薪 {sal_min:,} 元以上" if sal_type == 3 else f"{sal_min:,} 元以上"
+        salary_desc = f"月薪 {sal_min:,} 元以上"
     else:
         salary_desc = "面議"
 
@@ -95,8 +120,24 @@ def parse_detail(raw: dict) -> dict:
 
     # ── 薪資（從 jobDetail 取，比列表準確）──
     salary_desc = job_detail.get("salary", "")
-    sal_min = job_detail.get("salaryMin", 0) or 0
-    sal_max = job_detail.get("salaryMax", 0) or 0
+    sal_min_raw = job_detail.get("salaryMin", 0) or 0
+    sal_max_raw = job_detail.get("salaryMax", 0) or 0
+
+    # 推測薪資類型（從 salary_desc 或直接欄位）
+    sal_type = job_detail.get("salaryType", 3)  # 預設月薪
+    if sal_type == 0:  # 若欄位為 0，試著從 salary_desc 推測
+        if "時薪" in salary_desc:
+            sal_type = 1
+        elif "日薪" in salary_desc:
+            sal_type = 2
+        elif "年薪" in salary_desc:
+            sal_type = 6
+        else:
+            sal_type = 3  # 預設月薪
+
+    # 正規化到月薪
+    sal_min = normalize_salary_to_monthly(sal_min_raw, sal_type)
+    sal_max = normalize_salary_to_monthly(sal_max_raw, sal_type)
 
     # ── 工作地址 ──
     area = job_detail.get("addressRegion", "")
