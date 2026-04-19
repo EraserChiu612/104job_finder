@@ -4,6 +4,66 @@ import hashlib
 
 
 # --------------------------------------------------------------------------- #
+# 技能正規化
+# --------------------------------------------------------------------------- #
+
+# 別名 → 標準名稱（key 統一小寫）
+_SKILL_ALIAS: dict[str, str] = {
+    # Python
+    "python3": "Python", "python2": "Python", "python 3": "Python", "python 2": "Python",
+    # JavaScript
+    "javascript": "JavaScript", "js": "JavaScript", "es6": "JavaScript", "es2015": "JavaScript",
+    "typescript": "TypeScript", "ts": "TypeScript",
+    # Java
+    "java": "Java",
+    # C/C++
+    "c++": "C++", "cpp": "C++", "c/c++": "C/C++",
+    # C#
+    "c#": "C#", "csharp": "C#",
+    # Databases
+    "mysql": "MySQL", "postgresql": "PostgreSQL", "postgres": "PostgreSQL",
+    "mssql": "MS SQL", "sql server": "MS SQL", "microsoft sql server": "MS SQL",
+    "mongodb": "MongoDB", "mongo": "MongoDB",
+    "redis": "Redis",
+    "sqlite": "SQLite",
+    # Cloud
+    "aws": "AWS", "amazon web services": "AWS",
+    "gcp": "GCP", "google cloud": "GCP", "google cloud platform": "GCP",
+    "azure": "Azure", "microsoft azure": "Azure",
+    # Frameworks
+    "react": "React", "react.js": "React", "reactjs": "React",
+    "vue": "Vue.js", "vue.js": "Vue.js", "vuejs": "Vue.js",
+    "angular": "Angular", "angularjs": "Angular",
+    "node": "Node.js", "node.js": "Node.js", "nodejs": "Node.js",
+    "django": "Django", "flask": "Flask", "fastapi": "FastAPI",
+    "spring": "Spring", "spring boot": "Spring Boot", "springboot": "Spring Boot",
+    # DevOps
+    "docker": "Docker", "kubernetes": "Kubernetes", "k8s": "Kubernetes",
+    "git": "Git", "github": "Git", "gitlab": "Git",
+    "ci/cd": "CI/CD", "cicd": "CI/CD",
+    "linux": "Linux", "ubuntu": "Linux",
+    # Data / ML
+    "machine learning": "Machine Learning", "ml": "Machine Learning",
+    "deep learning": "Deep Learning", "dl": "Deep Learning",
+    "tensorflow": "TensorFlow", "pytorch": "PyTorch",
+    "pandas": "pandas", "numpy": "NumPy", "scikit-learn": "scikit-learn",
+    "excel": "Excel", "microsoft excel": "Excel",
+    "power bi": "Power BI", "powerbi": "Power BI",
+    "tableau": "Tableau",
+    "sql": "SQL",
+}
+
+
+def normalize_skill(name: str) -> str:
+    """將技能名稱正規化：查別名表，否則做 title-case 修正。"""
+    stripped = name.strip()
+    lower = stripped.lower()
+    if lower in _SKILL_ALIAS:
+        return _SKILL_ALIAS[lower]
+    return stripped
+
+
+# --------------------------------------------------------------------------- #
 # 列表解析
 # --------------------------------------------------------------------------- #
 
@@ -92,26 +152,33 @@ def parse_detail(raw: dict) -> dict:
     welfare = data.get("welfare", {})
 
     # ── 技能：specialty + skill + language ──
+    seen_skills: set = set()
     skills = []
+
+    def _add_skill(raw: str):
+        normed = normalize_skill(raw)
+        if normed and normed not in seen_skills:
+            seen_skills.add(normed)
+            skills.append(normed)
+
     for tag in condition.get("specialty", []):
-        # 可能是 {"description": "..."} 或直接字串
         if isinstance(tag, dict):
             name = tag.get("description", tag.get("code", "")).strip()
         else:
             name = str(tag).strip()
         if name:
-            skills.append(name)
+            _add_skill(name)
     for tag in condition.get("skill", []):
         if isinstance(tag, dict):
             name = tag.get("description", tag.get("code", "")).strip()
         else:
             name = str(tag).strip()
         if name:
-            skills.append(name)
+            _add_skill(name)
     for lang in condition.get("language", []):
         lang_name = lang.get("language", "").strip()
         if lang_name:
-            skills.append(f"{lang_name}（外語）")
+            _add_skill(f"{lang_name}（外語）")
 
     # ── 工作條件 ──
     experience = condition.get("workExp", "")
@@ -159,6 +226,7 @@ def parse_detail(raw: dict) -> dict:
         "salary_max": sal_max or None,
         "salary_desc": salary_desc or None,
         "area": area or None,
+        "area_detail": area_detail or None,
     }
 
 

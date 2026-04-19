@@ -615,6 +615,7 @@
     <nav style="display:flex; gap:4px; align-self:flex-end; padding-bottom:4px;">
         <button class="tab-btn active" data-view="jobs" onclick="showView('jobs')">JOB LIST</button>
         <button class="tab-btn" data-view="analytics" onclick="showView('analytics')">數據分析</button>
+        <button class="tab-btn" data-view="companies" onclick="showView('companies')">公司排行</button>
     </nav>
     <div class="mono" style="color: var(--neon-yellow);" id="sys-time">SYS.TIME: 00:00:00</div>
 </header>
@@ -780,6 +781,73 @@
         <div id="other-jobs-list" style="display:none; max-height:520px; overflow-y:auto; padding-top:8px;"></div>
     </div>
 
+    <!-- Timeline Section -->
+    <div class="a-section-header" style="color:var(--neon-cyan);">// TIME SERIES</div>
+    <div class="panel" style="margin-bottom:28px;">
+        <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
+            <span>每日新增職缺</span>
+            <select id="timeline-days" style="background:#0a0a14;color:var(--text-main);border:1px solid var(--neon-cyan);padding:2px 8px;font-size:0.8rem;">
+                <option value="14">近 14 天</option>
+                <option value="30" selected>近 30 天</option>
+                <option value="60">近 60 天</option>
+                <option value="90">近 90 天</option>
+            </select>
+        </div>
+        <div style="position:relative; height:260px;"><canvas id="timeline-chart"></canvas></div>
+    </div>
+
+    <!-- Salary by Skill Section -->
+    <div class="a-section-header" style="color:#ff6b35;">// SALARY × SKILL</div>
+    <div class="analytics-grid-2" style="margin-bottom:28px;">
+        <div class="panel">
+            <div class="panel-title">技能薪資排行 Top 20 <span class="mono" style="color:var(--text-dim);font-size:0.8rem;">（平均月薪，樣本數 ≥ 3）</span></div>
+            <div style="position:relative; height:400px;"><canvas id="salary-skill-chart"></canvas></div>
+        </div>
+        <div class="panel">
+            <div class="panel-title">技能薪資詳表</div>
+            <div id="salary-skill-table" style="max-height:400px; overflow-y:auto;"></div>
+        </div>
+    </div>
+
+    <!-- Cooccurrence Section -->
+    <div class="a-section-header" style="color:#00ff7f;">// SKILL CO-OCCURRENCE</div>
+    <div class="analytics-grid-2" style="margin-bottom:28px;">
+        <div class="panel">
+            <div class="panel-title">技能共現 Top 15 <span class="mono" style="color:var(--text-dim);font-size:0.8rem;">（同份職缺中同時出現的技能對）</span></div>
+            <div style="position:relative; height:360px;"><canvas id="cooccurrence-bar-chart"></canvas></div>
+        </div>
+        <div class="panel">
+            <div class="panel-title">共現排名</div>
+            <div id="cooccurrence-table" style="max-height:360px; overflow-y:auto;"></div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Companies View -->
+<div id="view-companies" style="display:none; padding:24px 20px; max-width:1600px; margin:0 auto; width:100%;">
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px; flex-wrap:wrap;">
+        <span class="mono" style="color:var(--neon-cyan); font-size:1rem;">// COMPANY RANKING</span>
+        <select id="companies-kw-filter" style="flex:1; max-width:280px; background:#0a0a14; color:var(--text-main); border:1px solid var(--neon-cyan); padding:4px 8px;">
+            <option value="">全部關鍵字</option>
+        </select>
+    </div>
+
+    <div class="analytics-grid-2" style="margin-bottom:28px;">
+        <div class="panel">
+            <div class="panel-title">發佈職缺數 Top 20</div>
+            <div style="position:relative; height:420px;"><canvas id="company-jobs-chart"></canvas></div>
+        </div>
+        <div class="panel">
+            <div class="panel-title">平均薪資 Top 20 <span class="mono" style="color:var(--text-dim);font-size:0.8rem;">（有薪資資料者）</span></div>
+            <div style="position:relative; height:420px;"><canvas id="company-salary-chart"></canvas></div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-title">公司完整排行</div>
+        <div id="companies-table" style="overflow-x:auto;"></div>
+    </div>
 </div>
 
 <!-- Modal -->
@@ -844,38 +912,51 @@
     function showView(view) {
         document.getElementById('view-jobs').style.display      = view === 'jobs'      ? '' : 'none';
         document.getElementById('view-analytics').style.display = view === 'analytics' ? '' : 'none';
+        document.getElementById('view-companies').style.display = view === 'companies' ? '' : 'none';
         document.querySelectorAll('.tab-btn').forEach(b => {
             b.classList.toggle('active', b.dataset.view === view);
         });
         if (view === 'analytics') loadAnalytics();
+        if (view === 'companies') loadCompanies();
     }
 
     // ── Chart instances ──
     let skillsChart = null, skillsBarChart = null;
     let otherChart = null, otherBarChart = null;
     let areaBarChart = null, expChart = null, eduChart = null, salaryChart = null;
+    let coocChart = null, salarySkillChart = null, timelineChart = null;
 
     // ── Load all analytics data ──
     async function loadAnalytics() {
         const kw = document.getElementById('analytics-kw-filter').value;
         const qs = kw ? '?keyword=' + encodeURIComponent(kw) : '';
         try {
-            const [sRes, oRes, dRes, stRes] = await Promise.all([
+            const days = document.getElementById('timeline-days').value;
+            const [sRes, oRes, dRes, stRes, coRes, ssRes, tlRes] = await Promise.all([
                 fetch('/api/analytics/skills' + qs),
                 fetch('/api/analytics/other' + qs),
                 fetch('/api/analytics/distribution' + qs),
                 fetch('/api/stats'),
+                fetch('/api/analytics/cooccurrence' + qs),
+                fetch('/api/analytics/salary-by-skill' + qs),
+                fetch('/api/analytics/timeline' + (qs ? qs + '&' : '?') + 'days=' + days),
             ]);
-            const skillsData = await sRes.json();
-            const otherData  = await oRes.json();
-            const distData   = await dRes.json();
-            const statsData  = await stRes.json();
+            const skillsData      = await sRes.json();
+            const otherData       = await oRes.json();
+            const distData        = await dRes.json();
+            const statsData       = await stRes.json();
+            const coocData        = await coRes.json();
+            const salarySkillData = await ssRes.json();
+            const timelineData    = await tlRes.json();
 
             renderKPI(statsData, skillsData, distData);
+            renderTimeline(timelineData);
             renderSkillsSection(skillsData);
             renderDistSection(distData);
             renderOtherSection(otherData);
             renderOtherJobsList(otherData.jobs);
+            renderSalaryBySkill(salarySkillData);
+            renderCooccurrence(coocData);
         } catch(e) {
             console.error('Analytics error:', e);
         }
@@ -939,6 +1020,113 @@
         const top15   = keywords.slice(0, 15);
         otherBarChart = buildHBarChart('other-bar-chart', top15.map(d=>d.name), top15.map(d=>d.count), otherBarChart);
         renderTagCloud(keywords);
+    }
+
+    function renderTimeline(data) {
+        if (!data) return;
+        const newJobs = data.new_jobs || [];
+        if (timelineChart) timelineChart.destroy();
+        const ctx = document.getElementById('timeline-chart').getContext('2d');
+        timelineChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: newJobs.map(d => d.date),
+                datasets: [{
+                    label: '新增職缺',
+                    data: newJobs.map(d => d.count),
+                    borderColor: '#00f3ff',
+                    backgroundColor: 'rgba(0,243,255,0.08)',
+                    pointBackgroundColor: '#00f3ff',
+                    pointRadius: 4,
+                    tension: 0.3,
+                    fill: true,
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { labels: { color: '#a0a0b0' } } },
+                scales: {
+                    x: { ticks: { color: '#a0a0b0', maxRotation: 45 }, grid: { color: 'rgba(255,255,255,0.04)' } },
+                    y: { ticks: { color: '#a0a0b0' }, grid: { color: 'rgba(255,255,255,0.04)' }, beginAtZero: true },
+                }
+            }
+        });
+    }
+
+    document.getElementById('timeline-days').addEventListener('change', loadAnalytics);
+
+    function renderSalaryBySkill(data) {
+        if (!data || data.length === 0) return;
+        const labels = data.map(d => d.skill);
+        const vals   = data.map(d => d.count);
+        const avgs   = data.map(d => d.avg_salary);
+
+        if (salarySkillChart) salarySkillChart.destroy();
+        const ctx = document.getElementById('salary-skill-chart').getContext('2d');
+        salarySkillChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [{
+                    label: '平均月薪 (元)',
+                    data: avgs,
+                    backgroundColor: avgs.map(v =>
+                        v >= 80000 ? '#00f3ff' : v >= 60000 ? '#00ff7f' : v >= 40000 ? '#fcee0a' : '#ff6b35'
+                    ),
+                    borderRadius: 3,
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false }, tooltip: {
+                    callbacks: { label: ctx => ` ${ctx.parsed.x.toLocaleString()} 元  (n=${vals[ctx.dataIndex]})` }
+                }},
+                scales: {
+                    x: { ticks: { color: '#a0a0b0', callback: v => (v/1000)+'K' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                    y: { ticks: { color: '#f5f5f5', font: { size: 11 } }, grid: { display: false } },
+                }
+            }
+        });
+
+        const maxSal = avgs[0] || 1;
+        const html = `<table class="rank-table"><thead><tr>
+            <th>#</th><th>技能</th><th class="td-right">平均月薪</th><th class="td-right">樣本數</th>
+        </tr></thead><tbody>` +
+        data.map((d, i) => {
+            const color = d.avg_salary >= 80000 ? 'var(--neon-cyan)' : d.avg_salary >= 60000 ? '#00ff7f' : d.avg_salary >= 40000 ? 'var(--neon-yellow)' : '#ff6b35';
+            return `<tr>
+                <td class="mono" style="color:var(--text-dim)">${i+1}</td>
+                <td>${d.skill}</td>
+                <td class="td-right mono" style="color:${color}">${d.avg_salary.toLocaleString()}</td>
+                <td class="td-right mono" style="color:var(--text-dim)">${d.count}</td>
+            </tr>`;
+        }).join('') + '</tbody></table>';
+        document.getElementById('salary-skill-table').innerHTML = html;
+    }
+
+    function renderCooccurrence(data) {
+        if (!data || data.length === 0) return;
+        const labels = data.map(d => `${d.skill_a}  ×  ${d.skill_b}`);
+        const counts = data.map(d => d.count);
+        coocChart = buildHBarChart('cooccurrence-bar-chart', labels, counts, coocChart);
+        const max = counts[0] || 1;
+        const html = `<table class="rank-table"><thead><tr>
+            <th>#</th><th>技能 A</th><th>技能 B</th><th class="td-right">共現次數</th>
+        </tr></thead><tbody>` +
+        data.map((d, i) => `<tr>
+            <td class="mono" style="color:var(--text-dim)">${i+1}</td>
+            <td style="color:var(--neon-cyan)">${d.skill_a}</td>
+            <td style="color:var(--neon-yellow)">${d.skill_b}</td>
+            <td class="td-right mono">
+                <div style="display:flex;align-items:center;gap:6px;justify-content:flex-end;">
+                    <div style="width:${Math.round(d.count/max*80)}px;height:6px;background:#00ff7f;border-radius:3px;"></div>
+                    ${d.count}
+                </div>
+            </td>
+        </tr>`).join('') +
+        '</tbody></table>';
+        document.getElementById('cooccurrence-table').innerHTML = html;
     }
 
     // ── Doughnut chart with center text ──
@@ -1148,11 +1336,94 @@
         }
     }
 
+    let companyJobsChart = null, companySalaryChart = null;
+
+    async function loadCompanies() {
+        const kw = document.getElementById('companies-kw-filter').value;
+        const qs = kw ? '?keyword=' + encodeURIComponent(kw) : '';
+        try {
+            const res = await fetch('/api/analytics/companies' + qs);
+            const data = await res.json();
+            renderCompanies(data);
+        } catch(e) {
+            console.error('Companies error:', e);
+        }
+    }
+
+    document.getElementById('companies-kw-filter').addEventListener('change', loadCompanies);
+
+    function renderCompanies(data) {
+        if (!data || data.length === 0) return;
+
+        // 職缺數 chart
+        const top15 = data.slice(0, 15);
+        if (companyJobsChart) companyJobsChart.destroy();
+        const ctx1 = document.getElementById('company-jobs-chart').getContext('2d');
+        companyJobsChart = new Chart(ctx1, {
+            type: 'bar',
+            data: {
+                labels: top15.map(d => d.company_name),
+                datasets: [{ label: '職缺數', data: top15.map(d => d.job_count),
+                    backgroundColor: 'rgba(0,243,255,0.7)', borderRadius: 3 }]
+            },
+            options: {
+                indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { ticks: { color: '#a0a0b0' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                    y: { ticks: { color: '#f5f5f5', font: { size: 11 } }, grid: { display: false } },
+                }
+            }
+        });
+
+        // 薪資 chart（只顯示有薪資資料的公司）
+        const withSal = data.filter(d => d.avg_salary > 0).slice(0, 15);
+        withSal.sort((a, b) => b.avg_salary - a.avg_salary);
+        if (companySalaryChart) companySalaryChart.destroy();
+        const ctx2 = document.getElementById('company-salary-chart').getContext('2d');
+        companySalaryChart = new Chart(ctx2, {
+            type: 'bar',
+            data: {
+                labels: withSal.map(d => d.company_name),
+                datasets: [{ label: '平均月薪', data: withSal.map(d => d.avg_salary),
+                    backgroundColor: withSal.map(d =>
+                        d.avg_salary >= 80000 ? '#00f3ff' : d.avg_salary >= 60000 ? '#00ff7f' : d.avg_salary >= 40000 ? '#fcee0a' : '#ff6b35'
+                    ), borderRadius: 3 }]
+            },
+            options: {
+                indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false }, tooltip: {
+                    callbacks: { label: ctx => ` ${ctx.parsed.x.toLocaleString()} 元` }
+                }},
+                scales: {
+                    x: { ticks: { color: '#a0a0b0', callback: v => (v/1000)+'K' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                    y: { ticks: { color: '#f5f5f5', font: { size: 11 } }, grid: { display: false } },
+                }
+            }
+        });
+
+        // 完整表格
+        const html = `<table class="rank-table"><thead><tr>
+            <th>#</th><th>公司</th><th class="td-right">職缺數</th>
+            <th class="td-right">平均月薪</th><th>熱門技能</th>
+        </tr></thead><tbody>` +
+        data.map((d, i) => `<tr>
+            <td class="mono" style="color:var(--text-dim)">${i+1}</td>
+            <td style="color:var(--neon-cyan)">${d.company_name}</td>
+            <td class="td-right mono">${d.job_count}</td>
+            <td class="td-right mono" style="color:${d.avg_salary >= 60000 ? '#00ff7f' : d.avg_salary > 0 ? 'var(--neon-yellow)' : 'var(--text-dim)'}">
+                ${d.avg_salary > 0 ? d.avg_salary.toLocaleString() : '面議'}
+            </td>
+            <td style="font-size:0.8rem; color:var(--text-dim)">${d.top_skills.join(' · ') || '—'}</td>
+        </tr>`).join('') + '</tbody></table>';
+        document.getElementById('companies-table').innerHTML = html;
+    }
+
     async function loadKeywordDropdown() {
         try {
             const res = await fetch('/api/keywords');
             const kws = await res.json();
-            ['filter-keyword', 'analytics-kw-filter'].forEach(id => {
+            ['filter-keyword', 'analytics-kw-filter', 'companies-kw-filter'].forEach(id => {
                 const select = document.getElementById(id);
                 if (!select) return;
                 // clear existing options except first

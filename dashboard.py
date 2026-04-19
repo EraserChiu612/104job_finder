@@ -9,6 +9,7 @@ import json
 import re
 import sqlite3
 from collections import Counter
+from itertools import combinations
 from pathlib import Path
 
 import yaml
@@ -17,6 +18,13 @@ from flask import Flask, jsonify, render_template_string, request
 app = Flask(__name__)
 
 DB_PATH = "data/jobs.db"
+
+
+def _init_db():
+    Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
+    from storage.db import JobDB
+    db = JobDB(DB_PATH)
+    db.close()
 
 
 def get_db():
@@ -51,8 +59,8 @@ def api_jobs():
         params.append(keyword)
 
     if area:
-        conditions.append("area LIKE ?")
-        params.append(f"%{area}%")
+        conditions.append("(area LIKE ? OR area_detail LIKE ?)")
+        params += [f"%{area}%", f"%{area}%"]
 
     if skill:
         conditions.append("skills LIKE ?")
@@ -322,6 +330,166 @@ def api_analytics_distribution():
     })
 
 
+@app.route("/api/analytics/companies")
+def api_analytics_companies():
+    conn = get_db()
+    kw = request.args.get("keyword", "")
+    top_n = int(request.args.get("top_n", 20))
+
+    base = "WHERE is_active=1"
+    params: list = []
+    if kw:
+        base += " AND keyword=?"
+        params.append(kw)
+
+    rows = conn.execute(
+        f"SELECT company_id, company_name, skills, salary_min, salary_max FROM jobs {base}",
+        params,
+    ).fetchall()
+    conn.close()
+
+    company_data: dict[str, dict] = {}
+    for row in rows:
+        cid = row["company_id"] or row["company_name"]
+        if not cid:
+            continue
+        if cid not in company_data:
+            company_data[cid] = {
+                "company_id": row["company_id"],
+                "company_name": row["company_name"],
+                "job_count": 0,
+                "salaries": [],
+                "skill_counter": Counter(),
+            }
+        entry = company_data[cid]
+        entry["job_count"] += 1
+        if row["salary_min"] and row["salary_min"] > 0:
+            avg = (row["salary_min"] + (row["salary_max"] or row["salary_min"])) / 2
+            entry["salaries"].append(avg)
+        try:
+            for s in json.loads(row["skills"] or "[]"):
+                if s.strip():
+                    entry["skill_counter"][s.strip()] += 1
+        except Exception:
+            pass
+
+    result = []
+    for entry in company_data.values():
+        sals = entry["salaries"]
+        top_skills = [s for s, _ in entry["skill_counter"].most_common(5)]
+        result.append({
+            "company_id": entry["company_id"],
+            "company_name": entry["company_name"],
+            "job_count": entry["job_count"],
+            "avg_salary": int(sum(sals) / len(sals)) if sals else 0,
+            "top_skills": top_skills,
+        })
+
+    result.sort(key=lambda x: x["job_count"], reverse=True)
+    return jsonify(result[:top_n])
+
+
+@app.route("/api/analytics/timeline")
+def api_analytics_timeline():
+    conn = get_db()
+    kw = request.args.get("keyword", "")
+    days = int(request.args.get("days", 30))
+
+    base = "WHERE date(first_seen_at) >= date('now', ?)"
+    params: list = [f"-{days} days"]
+    if kw:
+        base += " AND keyword=?"
+        params.append(kw)
+
+    new_jobs = conn.execute(
+        f"SELECT date(first_seen_at) as d, COUNT(*) as cnt FROM jobs {base} GROUP BY d ORDER BY d",
+        params,
+    ).fetchall()
+
+    crawl_params: list = [f"-{days} days"]
+    crawl_base = "WHERE date(started_at) >= date('now', ?) AND status='ok'"
+    if kw:
+        crawl_base += " AND keyword=?"
+        crawl_params.append(kw)
+
+    crawl_logs = conn.execute(
+        f"SELECT date(started_at) as d, SUM(new_jobs) as new_j, SUM(updated_jobs) as upd_j FROM crawl_logs {crawl_base} GROUP BY d ORDER BY d",
+        crawl_params,
+    ).fetchall()
+    conn.close()
+
+    return jsonify({
+        "new_jobs": [{"date": r["d"], "count": r["cnt"]} for r in new_jobs],
+        "crawl_activity": [{"date": r["d"], "new": r["new_j"] or 0, "updated": r["upd_j"] or 0} for r in crawl_logs],
+    })
+
+
+@app.route("/api/analytics/salary-by-skill")
+def api_analytics_salary_by_skill():
+    conn = get_db()
+    kw = request.args.get("keyword", "")
+    top_n = int(request.args.get("top_n", 20))
+    sql = "SELECT skills, salary_min, salary_max FROM jobs WHERE is_active=1 AND skills IS NOT NULL AND salary_min > 0"
+    params = []
+    if kw:
+        sql += " AND keyword=?"
+        params.append(kw)
+    rows = conn.execute(sql, params).fetchall()
+    conn.close()
+
+    skill_salaries: dict[str, list] = {}
+    for row in rows:
+        try:
+            skill_list = [s.strip() for s in json.loads(row["skills"]) if s.strip()]
+        except Exception:
+            continue
+        avg = (row["salary_min"] + (row["salary_max"] or row["salary_min"])) / 2
+        for skill in skill_list:
+            skill_salaries.setdefault(skill, []).append(avg)
+
+    result = [
+        {
+            "skill": skill,
+            "avg_salary": int(sum(vals) / len(vals)),
+            "count": len(vals),
+        }
+        for skill, vals in skill_salaries.items()
+        if len(vals) >= 3  # 樣本數太少不具參考價值
+    ]
+    result.sort(key=lambda x: x["avg_salary"], reverse=True)
+    return jsonify(result[:top_n])
+
+
+@app.route("/api/analytics/cooccurrence")
+def api_analytics_cooccurrence():
+    conn = get_db()
+    kw = request.args.get("keyword", "")
+    top_n = int(request.args.get("top_n", 15))
+    sql = "SELECT skills FROM jobs WHERE is_active=1 AND skills IS NOT NULL"
+    params = []
+    if kw:
+        sql += " AND keyword=?"
+        params.append(kw)
+    rows = conn.execute(sql, params).fetchall()
+    conn.close()
+
+    pair_counter: Counter = Counter()
+    for row in rows:
+        try:
+            skill_list = [s.strip() for s in json.loads(row["skills"]) if s.strip()]
+        except Exception:
+            continue
+        # 只取前 20 個技能避免組合爆炸
+        for a, b in combinations(sorted(set(skill_list[:20])), 2):
+            pair_counter[(a, b)] += 1
+
+    result = [
+        {"skill_a": a, "skill_b": b, "count": c}
+        for (a, b), c in pair_counter.most_common(top_n)
+    ]
+    return jsonify(result)
+
+
 # ─────────────────────────────────────────────
 # Serve Dashboard HTML
 # ─────────────────────────────────────────────
@@ -333,6 +501,7 @@ def index():
 
 
 if __name__ == "__main__":
+    _init_db()
     print("\n  ╔══════════════════════════════════════╗")
     print("  ║  CYBERPUNK JOB DASHBOARD  v1.0       ║")
     print("  ║  http://localhost:5000               ║")

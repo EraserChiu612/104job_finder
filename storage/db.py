@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     company_name    TEXT,
     company_id      TEXT,
     area            TEXT,
+    area_detail     TEXT,
     salary_min      INTEGER DEFAULT 0,
     salary_max      INTEGER DEFAULT 0,
     salary_desc     TEXT,
@@ -95,6 +96,11 @@ class JobDB:
                 self.conn.commit()
             except Exception:
                 pass
+        try:
+            self.conn.execute("ALTER TABLE jobs ADD COLUMN area_detail TEXT")
+            self.conn.commit()
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------ helpers
     @staticmethod
@@ -127,6 +133,15 @@ class JobDB:
         插入或更新職缺。
         回傳: 'new' | 'updated' | 'unchanged'
         """
+        # 確保所有欄位都有 key，避免 named binding 缺失
+        defaults = {
+            "other": None, "area_detail": None, "description": None,
+            "welfare": None, "job_type": None, "experience": None,
+            "education": None, "skills": None, "salary_desc": None,
+            "salary_min": 0, "salary_max": 0, "area": None, "company_id": None,
+        }
+        job = {**defaults, **job}
+
         now = self._now()
         job_id = job["job_id"]
         new_hash = job.get("content_hash", "")
@@ -140,13 +155,13 @@ class JobDB:
             self.conn.execute(
                 """
                 INSERT INTO jobs
-                    (job_id, keyword, title, company_name, company_id, area,
+                    (job_id, keyword, title, company_name, company_id, area, area_detail,
                      salary_min, salary_max, salary_desc, job_type,
                      experience, education, skills, other, description, welfare,
                      job_url, first_seen_at, last_seen_at, last_updated_at,
                      is_active, content_hash)
                 VALUES
-                    (:job_id, :keyword, :title, :company_name, :company_id, :area,
+                    (:job_id, :keyword, :title, :company_name, :company_id, :area, :area_detail,
                      :salary_min, :salary_max, :salary_desc, :job_type,
                      :experience, :education, :skills, :other, :description, :welfare,
                      :job_url, :now, :now, :now,
@@ -158,10 +173,10 @@ class JobDB:
             self.conn.commit()
             return "new"
 
-        # 更新 last_seen，同時補上 other（若之前是 NULL）
+        # 更新 last_seen，同時補上 other / area_detail（若之前是 NULL）
         self.conn.execute(
-            "UPDATE jobs SET last_seen_at = ?, is_active = 1, other = COALESCE(other, ?) WHERE job_id = ?",
-            (now, job.get("other"), job_id),
+            "UPDATE jobs SET last_seen_at = ?, is_active = 1, other = COALESCE(other, ?), area_detail = COALESCE(area_detail, ?) WHERE job_id = ?",
+            (now, job.get("other"), job.get("area_detail"), job_id),
         )
 
         if row["content_hash"] != new_hash:
@@ -171,6 +186,8 @@ class JobDB:
                 UPDATE jobs SET
                     title           = :title,
                     company_name    = :company_name,
+                    area            = :area,
+                    area_detail     = :area_detail,
                     salary_min      = :salary_min,
                     salary_max      = :salary_max,
                     salary_desc     = :salary_desc,
